@@ -1,3 +1,21 @@
+# ============================================================================
+# LEGACY / NOT DEPLOYED — Railway has been decommissioned.
+#
+# This aiohttp + aiogram polling bot is no longer running anywhere. The
+# project now runs entirely on Git + Cloudflare: a local scraper posts
+# scraped OLX listings to the olx-free-stuff-worker Cloudflare Worker,
+# which stores them in Workers KV and backs them up to this repo's
+# data/offers.json. There is currently no live Telegram bot serving that
+# data to users.
+#
+# This file (and config/, database/, handlers/, keyboards/, locales/,
+# utils/) is kept for reference only. Note also that data/offers.json no
+# longer has the {"raw", "translations"} shape this code expects — it now
+# has the Cloudflare Worker's {"date","listings","timestamp"} shape.
+#
+# See README.md for the current architecture.
+# ============================================================================
+
 import asyncio
 import logging
 import os
