@@ -1,9 +1,11 @@
 # OLX Free Stuff Bot
 
-Scrapes free ("za darmo") listings from OLX and stores them as a GitHub-backed
-JSON snapshot. Sibling of
+Scrapes free ("za darmo") listings from OLX, stores them as a GitHub-backed
+JSON snapshot, and delivers them to Telegram users via a menu/language-button
+bot. Sibling of
 [telegram-multilang-bot](https://github.com/alexalkor/telegram-multilang-bot)
-(the Warsaw events bot).
+(the Warsaw events bot) — the Telegram bot below mirrors that project's
+menu/language-picker pattern.
 
 ## Status (as of 2026-08-27)
 
@@ -11,16 +13,26 @@ JSON snapshot. Sibling of
 repo (`main.py` and its supporting `config/`, `database/`, `handlers/`,
 `keyboards/`, `locales/`, `utils/` modules) is **legacy code and is not
 currently deployed anywhere**. It's kept for reference only — see the notice
-at the top of `main.py`, and the **Legacy** section below.
+at the top of `main.py`, and the **Legacy** section below. It has been
+replaced by a Cloudflare Worker Telegram bot (menu + inline language picker),
+described below.
 
-The project now runs entirely on **Git + Cloudflare**, nothing else:
+The project now runs entirely on **Git + Cloudflare**, nothing else — including
+the Worker's deploys, which now happen automatically on every push to `main`
+via [Cloudflare Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/)
+(`npx wrangler deploy`, config in [`wrangler.toml`](wrangler.toml)):
 
 ```
 OLX Free Stuff Scrapper          Cloudflare Worker                 GitHub
   (local scheduled task)  --POST-->  olx-free-stuff-worker  --PUT-->  this repo
                           (auth: X-Secret header)    |            (data/offers.json)
                                                       +-> Workers KV
-                                                          (OFFERS_KV, key "latest")
+                                                      |   (OFFERS_KV, key "latest"
+                                                      |    + per-user "lang:<chatId>")
+                                                      |
+                                                      +-> Telegram Bot API
+                                                          (webhook: menu, language
+                                                           picker, offer delivery)
 ```
 
 1. The scraper (a local scheduled task, not part of this repo) scrapes OLX,
@@ -28,36 +40,50 @@ OLX Free Stuff Scrapper          Cloudflare Worker                 GitHub
    `olx-free-stuff-worker`.
 2. The Worker stores the payload in Workers KV under key `"latest"`, then
    backs it up to this repo as `data/offers.json` via the GitHub Contents API.
-3. **There is currently no live Telegram bot reading this data.** The
-   `GET /offers` endpoint on the Worker exists for debugging (and as a hook
-   for a future bot), but nothing today pushes these listings to Telegram
-   users. If the bot shows nothing, that's expected — no service currently
-   sends Telegram messages.
+3. Telegram users message the bot; the Worker receives updates via webhook
+   (`POST /webhook`) and responds with an inline-keyboard menu — **🆓 Free
+   offers**, **🌐 Language**, **⛔ Stop** — plus a 6-language picker (English,
+   Polish, Russian, Belarusian, Ukrainian, German). Only the UI chrome
+   (buttons/labels) is translated; offer listings themselves are shown as
+   scraped, same as the sibling bot.
 
-The Worker's source is **not** checked into this repo — it's edited directly
-in the Cloudflare dashboard's Quick Editor. A mirror of the deployed source
-is kept here for version control: [`cloudflare/olx-free-stuff-worker.js`](cloudflare/olx-free-stuff-worker.js)
-(update it manually after dashboard edits — it isn't auto-synced).
+The Worker's source **is** checked into this repo at
+[`cloudflare/olx-free-stuff-worker.js`](cloudflare/olx-free-stuff-worker.js)
+and deploys automatically — there's no manual Quick Editor step anymore for
+day-to-day changes; just push to `main`.
 
 ## Worker endpoints (`olx-free-stuff-worker`, Cloudflare)
 
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET` | `/health` | Liveness check |
-| `GET` | `/offers` | Returns the last-stored payload from KV (debugging / future bot) |
+| `GET` | `/offers` | Returns the last-stored payload from KV (debugging) |
 | `POST` | `/offers` | Body: `{"listings":[{title,link,description,posted_at}, ...], "date":"YYYY-MM-DD"}`, header `X-Secret: <WEBHOOK_SECRET>`. Stores to KV, then backs up to GitHub as `data/offers.json`. |
+| `POST` | `/webhook` | Telegram webhook target. Auth: header `X-Telegram-Bot-Api-Secret-Token` must match `WEBHOOK_SECRET`. |
+| `GET` | `/admin/set-webhook` | One-time setup: registers this Worker's `/webhook` URL with Telegram. Auth: `?secret=<WEBHOOK_SECRET>` query param. |
+| `GET` | `/admin/webhook-info` | Proxies Telegram's `getWebhookInfo`, for debugging delivery. Auth: `?secret=<WEBHOOK_SECRET>` query param. |
 
 Required Cloudflare configuration (Settings → Variables/Bindings on
-`olx-free-stuff-worker`):
+`olx-free-stuff-worker`; bindings/vars live in [`wrangler.toml`](wrangler.toml),
+secrets are set via the dashboard and are **not** committed):
 
-- KV namespace binding `OFFERS_KV`
-- `GITHUB_REPO` = `alexalkor/olx-free-stuff-bot` (plain text var)
-- `GITHUB_FILE` = `data/offers.json` (plain text var)
-- `WEBHOOK_SECRET` — must match the `X-Secret` header the scraper sends (secret)
-- `GITHUB_PAT` — fine-grained PAT scoped to this repo, `Contents: Read and write` (secret)
+- KV namespace binding `OFFERS_KV` (in `wrangler.toml`)
+- `GITHUB_REPO` = `alexalkor/olx-free-stuff-bot` (plain text var, in `wrangler.toml`)
+- `GITHUB_FILE` = `data/offers.json` (plain text var, in `wrangler.toml`)
+- `WEBHOOK_SECRET` — shared secret. Must match the `X-Secret` header the
+  scraper sends, **and** is reused as the Telegram webhook's
+  `secret_token` (secret, dashboard-only)
+- `GITHUB_PAT` — fine-grained PAT scoped to this repo, `Contents: Read and write`
+  (secret, dashboard-only)
+- `BOT_TOKEN` — Telegram bot token from @BotFather (secret, dashboard-only)
 
-No cron trigger is configured on the Worker — it only runs when the scraper's
-scheduled task POSTs to it.
+One-time setup after `BOT_TOKEN` is added: visit
+`https://<worker-subdomain>/admin/set-webhook?secret=<WEBHOOK_SECRET>` once
+in a browser to register the Telegram webhook.
+
+No cron trigger is configured on the Worker — the scraper ingest side only
+runs when the scraper's scheduled task `POST`s to it; the Telegram side only
+runs when Telegram delivers a webhook update.
 
 ## `data/offers.json` format (current, live)
 
@@ -85,8 +111,9 @@ instead:
 
 ```
 .
+├── wrangler.toml                  # Worker config (name, main entry, KV binding, plain-text vars)
 ├── cloudflare/
-│   └── olx-free-stuff-worker.js   # mirror of the deployed Worker — see Status above
+│   └── olx-free-stuff-worker.js   # the deployed Worker source — see Status above
 ├── main.py                        # LEGACY — aiohttp + aiogram polling bot, not deployed
 ├── .env.example                   # LEGACY — only relevant if main.py is redeployed somewhere
 ├── requirements.txt                # LEGACY
@@ -106,11 +133,11 @@ instead:
 ## Legacy: the Railway/aiogram bot (not deployed)
 
 Everything in this section describes the bot as it worked **before Railway
-was decommissioned**. None of it runs today. It's left in the repo in case
-Telegram delivery gets rebuilt later — most likely as a Cloudflare Worker
-acting as a Telegram webhook (the pattern `warsaw-events-worker` now uses
-for the sibling project), rather than a redeployed Railway/aiogram polling
-process.
+was decommissioned**. None of it runs today. It's left in the repo for
+reference; Telegram delivery has since been rebuilt as a Cloudflare Worker
+acting as a Telegram webhook (the pattern `warsaw-events-worker` uses for the
+sibling project), described above, rather than a redeployed Railway/aiogram
+polling process.
 
 <details>
 <summary>Expand for the original Railway-era documentation</summary>
