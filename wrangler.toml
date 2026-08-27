@@ -1,0 +1,11 @@
+name = "olx-free-stuff-worker"
+main = "cloudflare/olx-free-stuff-worker.js"
+compatibility_date = "2026-08-27"
+
+[[kv_namespaces]]
+binding = "OFFERS_KV"
+id = "d3d465889d804bee80280fccdd8ef67c"
+
+[vars]
+GITHUB_REPO = "alexalkor/olx-free-stuff-bot"
+GITHUB_FILE = "data/offers.json"
