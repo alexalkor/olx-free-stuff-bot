@@ -1,0 +1,12 @@
+{
+  "language_set": "✅ Ustawiono język polski.",
+  "help_text": "📖 <b>Pomoc</b>\n\nDostępne polecenia:\n/start — menu główne\n/language — zmień język\n/help — ta wiadomość",
+  "choose_action": "Darmowe rzeczy z OLX",
+  "btn_offers": "🆓 Darmowe oferty OLX",
+  "btn_change_lang": "🌐 Zmień język",
+  "btn_stop": "⛔ Zatrzymaj",
+  "stopped": "Bot zatrzymany. Wyślij /start, aby wznowić.",
+  "no_offers": "Brak opublikowanych ofert.",
+  "offers_header": "🆓 <b>Najnowsze darmowe oferty z OLX:</b>",
+  "offers_footer": "Udanych łowów! 🍀"
+}
