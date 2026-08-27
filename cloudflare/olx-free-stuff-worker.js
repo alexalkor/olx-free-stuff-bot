@@ -149,7 +149,7 @@ const I18N = {
     stopped: "Остановлено. Отправьте /start, чтобы продолжить.",
     no_offers: "Пока нет сохранённых объявлений — проверьте позже, после следующего сканирования.",
     header: "🆓 Бесплатные вещи на OLX Варшава:",
-    footer: "— Это текущая партья. Используйте меню ниже, чтобы проверить позже.",
+    footer: "— Это текущая партия. Используйте меню ниже, чтобы проверить позже.",
     help: "/start — показать меню\n/language — сменить язык\n/help — это сообщение",
   },
   be: {
@@ -174,9 +174,9 @@ const I18N = {
     btn_stop: "⛔ Стоп",
     stopped: "Зупинено. Надішліть /start, щоб відновити.",
     no_offers: "Поки що немає збережених оголошень — перевірте пізніше, після наступного сканування.",
-    header: "🆓 Бесплатные речі на OLX Варшава:",
+    header: "🆓 Безкоштовні речі на OLX Варшава:",
     footer: "— Це поточна партія. Скористайтеся меню нижче, щоб перевірити пізніше.",
-    help: "/start — показати меню\n/language — змінити мову\n/help — це повідомленне",
+    help: "/start — показати меню\n/language — змінити мову\n/help — це повідомлення",
   },
   de: {
     welcome: "👋 Willkommen! Ich poste kostenlose (\"za darmo\") Anzeigen von OLX Warschau.\n\nSprache wählen:",
@@ -246,7 +246,7 @@ async function getUserLang(kv, chatId) {
 function formatListing(listing, idx) {
   const lines = [`${idx}. 🆓 ${escapeHtml(listing.title || "")}`];
   if (listing.description) lines.push(escapeHtml(listing.description));
-  if (listing.posted_at) lines.push(`🔒 ${escapeHtml(listing.posted_at)}`);
+  if (listing.posted_at) lines.push(`🕒 ${escapeHtml(listing.posted_at)}`);
   if (listing.link) lines.push(listing.link);
   return lines.join("\n");
 }
@@ -424,7 +424,7 @@ export default {
       return json({ ok: true, webhookUrl, telegram: result });
     }
 
-   if (url.pathname === "/admin/webhook-info" && request.method === "GET") {
+    if (url.pathname === "/admin/webhook-info" && request.method === "GET") {
       if (!env.WEBHOOK_SECRET || url.searchParams.get("secret") !== env.WEBHOOK_SECRET) {
         return json({ ok: false, error: "Unauthorized" }, 401);
       }
