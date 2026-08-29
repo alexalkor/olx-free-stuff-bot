@@ -304,6 +304,9 @@ async function handleUpdate(update, env) {
     if (cmd === "/start") await send(env, chatId, tr(lang, "welcome"), { reply_markup: langKeyboard() });
     else if (cmd === "/language") await send(env, chatId, "🌐", { reply_markup: langKeyboard() });
     else if (cmd === "/help") await send(env, chatId, tr(lang, "help"));
+    // Anything else (plain text, an unrecognized command) previously got no
+    // reply at all. Fall back to the menu instead of going silent.
+    else await send(env, chatId, tr(lang, "choose_action"), { reply_markup: menuKeyboard(lang) });
     return;
   }
 
@@ -375,6 +378,15 @@ export default {
       const listings = Array.isArray(payload.listings) ? payload.listings : null;
       if (!listings) {
         return json({ ok: false, error: "Expected { listings: [...] }" }, 400);
+      }
+
+      // An empty batch is almost always a bad scrape (site layout change,
+      // network hiccup, transient zero results) rather than "no free items
+      // exist today". Overwriting KV/GitHub with it would wipe out the last
+      // good batch and leave users seeing "no offers" until the next
+      // successful scrape. Skip the write instead of silently clobbering it.
+      if (listings.length === 0) {
+        return json({ ok: true, skipped: true, reason: "empty listings array — kept previous batch" });
       }
 
       const stored = {
